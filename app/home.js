@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { discountPercent, hasDiscount, isActivePlan, periodLabel } from "./plans";
+import { discountPercent, hasDiscount, isActivePlan, periodLabel, planOf } from "./plans";
 import { supabase } from "./shared";
 import BookSessionDialog from "./book-session";
 import { BUSINESS, POLICY_LINKS } from "./business";
@@ -123,8 +123,8 @@ export default function Home({ plans }) {
       if (!session) return;
       setLoggedIn(true);
       // RLS returns only this user's rows.
-      const { data } = await supabase.from("orders").select("plan, paid_at").eq("status", "paid");
-      setActivePlans((data ?? []).filter((order) => isActivePlan(plans, order.plan, order.paid_at)).map((order) => order.plan));
+      const { data } = await supabase.from("orders").select("plan, plan_id, paid_at").eq("status", "paid");
+      setActivePlans((data ?? []).filter((order) => isActivePlan(plans, order)).map((order) => planOf(plans, order)?.id));
     });
   }, [plans]);
 
@@ -204,8 +204,8 @@ export default function Home({ plans }) {
                   {service.features.map((feature) => <li key={feature}><CircleCheck size={17} />{feature}</li>)}
                 </ul>
                 <div className="plan-footer">
-                  <div>{hasDiscount(service) && <span className="price-mrp"><s>₹{service.original_amount.toLocaleString("en-IN")}</s> <em>{discountPercent(service)}% off</em></span>}<strong>₹{service.amount.toLocaleString("en-IN")}</strong>{activePlans.includes(service.title) ? <span className="plan-active"><CircleCheck size={13} /> Active plan</span> : <span>{periodLabel(service)}</span>}</div>
-                  {activePlans.includes(service.title) ? (
+                  <div>{hasDiscount(service) && <span className="price-mrp"><s>₹{service.original_amount.toLocaleString("en-IN")}</s> <em>{discountPercent(service)}% off</em></span>}<strong>₹{service.amount.toLocaleString("en-IN")}</strong>{activePlans.includes(service.id) ? <span className="plan-active"><CircleCheck size={13} /> Active plan</span> : <span>{periodLabel(service)}</span>}</div>
+                  {activePlans.includes(service.id) ? (
                     <Link className="button button-outline plan-buy" href="/dashboard">View plan <ArrowRight size={16} /></Link>
                   ) : (
                     <button type="button" className="button button-dark plan-buy" onClick={() => buyPlan(service)}>Enrol Now <ArrowRight size={16} /></button>
@@ -223,7 +223,7 @@ export default function Home({ plans }) {
         {showMore && <div className="program-grid" id="more-programs">
           {more.map((service, index) => {
             const Icon = programIcons[service.icon] || Leaf;
-            const active = activePlans.includes(service.title);
+            const active = activePlans.includes(service.id);
             return (
               <article className="program-card" key={service.id} style={{ "--i": index }}>
                 <div className="program-head">

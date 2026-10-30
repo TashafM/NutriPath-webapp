@@ -1,4 +1,4 @@
-import { isActivePlan, planEnd } from "../../plans";
+import { isActivePlan, planEnd, planOf } from "../../plans";
 import { REQUEST_STATUSES, todayIST } from "../../requests";
 import { db } from "../razorpay/lib";
 import { adminEmails, requireAdmin } from "./auth";
@@ -14,7 +14,7 @@ async function loadClients() {
   const [{ data: usersPage, error: usersError }, { data: orders, error: ordersError }, { data: plans, error: plansError }] = await Promise.all([
     db().auth.admin.listUsers({ perPage: 1000 }),
     db().from("orders").select("*").eq("status", "paid").order("paid_at", { ascending: false }),
-    db().from("plans").select("title, period").order("sort"),
+    db().from("plans").select("id, title, period").order("sort"),
   ]);
   if (usersError) throw usersError;
   if (ordersError) throw ordersError;
@@ -33,11 +33,12 @@ async function loadClients() {
       orders: userOrders.map((order) => ({
         id: order.id,
         plan: order.plan,
+        planId: planOf(plans ?? [], order)?.id ?? null,
         amount: order.amount,
         paymentId: order.payment_id,
         paidAt: order.paid_at,
-        validTill: plans?.find((plan) => plan.title === order.plan)?.period === "session" ? null : planEnd(order.paid_at),
-        active: isActivePlan(plans ?? [], order.plan, order.paid_at),
+        validTill: planOf(plans ?? [], order)?.period === "session" ? null : planEnd(order.paid_at),
+        active: isActivePlan(plans ?? [], order),
       })),
     };
   });
@@ -119,7 +120,7 @@ export async function GET(req) {
     },
     recentPayments: payments.slice(0, 6),
     planBreakdown: plans.map((plan) => {
-      const sold = payments.filter((order) => order.plan === plan.title);
+      const sold = payments.filter((order) => order.planId === plan.id);
       return { title: plan.title, active: sold.filter((order) => order.active).length, sold: sold.length, revenue: sum(sold) };
     }),
   });

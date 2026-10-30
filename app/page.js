@@ -1,13 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import Home from "./home";
 
-// Plans are edited from /admin, so read them fresh on every request.
-export const dynamic = "force-dynamic";
+// Cached page: rebuilt at most once an hour, and straight away whenever an admin
+// changes a plan (see revalidatePath in app/api/admin/plans/route.js).
+export const revalidate = 3600;
 
 export default async function Page() {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   const { data, error } = await supabase.from("plans").select("*").eq("published", true).order("sort").order("id");
-  // Keep the rest of the site up if plans can't load; the plans section shows a fallback message instead.
-  if (error) console.error("Could not load plans:", error.message);
+  // Throwing keeps the last good cached page live (rather than caching a page with no plans);
+  // the next visit after the error tries again.
+  if (error) throw new Error(`Could not load plans: ${error.message}`);
   return <Home plans={data ?? []} />;
 }

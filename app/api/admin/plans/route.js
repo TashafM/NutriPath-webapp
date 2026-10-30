@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { MAX_FEATURED, PLAN_ICONS } from "../../../plans";
 import { db } from "../../razorpay/lib";
 import { requireAdmin } from "../auth";
@@ -57,6 +58,7 @@ export async function POST(req) {
   const { data: last } = await db().from("plans").select("sort").order("sort", { ascending: false }).limit(1).maybeSingle();
   const { data, error } = await db().from("plans").insert({ ...plan, sort: (last?.sort ?? 0) + 10 }).select().single();
   if (error) return fail(error);
+  revalidatePath("/");
   return Response.json({ plan: data });
 }
 
@@ -69,6 +71,7 @@ export async function PUT(req) {
   if (plan.featured && (await tooManyFeatured(body.id))) return fail(`Only ${MAX_FEATURED} plans can be starred. Unstar one first.`);
   const { data, error } = await db().from("plans").update(plan).eq("id", body.id).select().single();
   if (error) return fail(error);
+  revalidatePath("/");
   return Response.json({ plan: data });
 }
 
@@ -82,6 +85,7 @@ export async function PATCH(req) {
   const results = await Promise.all(body.map(({ id, sort }) => db().from("plans").update({ sort }).eq("id", id)));
   const failed = results.find((result) => result.error);
   if (failed) return fail(failed.error);
+  revalidatePath("/");
   return Response.json({ ok: true });
 }
 
@@ -90,5 +94,6 @@ export async function DELETE(req) {
   if (admin instanceof Response) return admin;
   const { error } = await db().from("plans").delete().eq("id", new URL(req.url).searchParams.get("id"));
   if (error) return fail(error);
+  revalidatePath("/");
   return Response.json({ ok: true });
 }

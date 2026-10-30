@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, CalendarDays, CircleCheck, Clock, IndianRupee, Receipt, LogOut, MessageCircle, Sparkles, UserRound } from "lucide-react";
 import { BUSINESS } from "../business";
-import { isActivePlan, planEnd } from "../plans";
+import { isActivePlan, planEnd, planOf } from "../plans";
 import LogoutButton from "../logout-button";
 import { supabase } from "../shared";
 
@@ -13,12 +13,13 @@ const DAY = 24 * 60 * 60 * 1000;
 const formatDate = (date) => date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 const rupees = (amount) => `₹${amount.toLocaleString("en-IN")}`;
 
-function planDates(plans, planTitle, paidAt) {
+function planDates(plans, order) {
+  const paidAt = order.paid_at;
   const start = new Date(paidAt);
   const end = planEnd(paidAt);
   const totalDays = Math.round((end - start) / DAY);
   const dayNumber = Math.min(totalDays, Math.max(1, Math.ceil((Date.now() - start) / DAY)));
-  return { start, end, totalDays, dayNumber, daysLeft: totalDays - dayNumber, active: isActivePlan(plans, planTitle, paidAt) };
+  return { start, end, totalDays, dayNumber, daysLeft: totalDays - dayNumber, active: isActivePlan(plans, order) };
 }
 
 const greeting = () => {
@@ -83,7 +84,7 @@ export default function Dashboard() {
   }
 
   const firstName = user.user_metadata?.full_name?.split(" ")[0];
-  const withDates = orders.map((order) => ({ order, plan: plans.find((item) => item.title === order.plan), ...planDates(plans, order.plan, order.paid_at) }));
+  const withDates = orders.map((order) => ({ order, plan: planOf(plans, order), ...planDates(plans, order) }));
   const activePlans = withDates.filter((item) => item.active);
   const stats = [
     { Icon: Sparkles, label: "Active plans", value: activePlans.length },

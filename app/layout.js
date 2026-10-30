@@ -1,8 +1,11 @@
-import { Inter } from "next/font/google";
+import { Gelasio, Inter } from "next/font/google";
 import "./globals.css";
 
 // Helvetica Neue is licensed and only installed on Apple devices; Inter is the closest free stand-in elsewhere.
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+// Headings are designed in Georgia. Gelasio is a free font made to match Georgia, so devices
+// without Georgia (most Android phones) get the same look. Only downloaded where it is used.
+const gelasio = Gelasio({ subsets: ["latin"], weight: ["400", "500", "600"], style: ["normal", "italic"], variable: "--font-gelasio", display: "swap", preload: false });
 
 const title = "The NutriPath | A more personal path to better health";
 const description =
@@ -24,7 +27,7 @@ export const viewport = { themeColor: "#22301b" };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${gelasio.variable}`}>
       <body>{children}</body>
     </html>
   );

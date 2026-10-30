@@ -19,11 +19,14 @@ export function planEnd(paidAt) {
   return end;
 }
 
+// The plan an order was for: matched by plan_id, so renaming a plan keeps it linked.
+// Older orders (before plan_id existed) fall back to the title they were bought under.
+export const planOf = (plans, order) => plans.find((item) => (order.plan_id ? item.id === order.plan_id : item.title === order.plan));
+
 // Sessions never block a repeat purchase, so only monthly plans count as "active".
-// Orders store the plan title, so a plan renamed or deleted later falls back to "month".
-export function isActivePlan(plans, planTitle, paidAt) {
-  const plan = plans.find((item) => item.title === planTitle);
-  return plan?.period !== "session" && planEnd(paidAt) > new Date();
+// A plan deleted later falls back to "month".
+export function isActivePlan(plans, order) {
+  return planOf(plans, order)?.period !== "session" && planEnd(order.paid_at) > new Date();
 }
 
 // Options for the free session form (app/book-session.js).
