@@ -171,11 +171,12 @@ export default function Dashboard() {
         </main>
 
         <aside className="ud-aside">
-          <section className="ud-card ud-coach">
+          {/* Direct contact is part of an active plan. */}
+          {activePlans.length > 0 && <section className="ud-card ud-coach">
             <span className="ud-eyebrow">YOUR NUTRITIONIST</span>
             <div className="ud-coach-head"><span className="dash-avatar ud-coach-avatar"><UserRound size={20} /></span><div><strong>{BUSINESS.owner}</strong><small>Nutritionist &amp; Health Coach</small></div></div>
             <a className="ud-whatsapp" href={`${BUSINESS.whatsapp}?text=${encodeURIComponent(`Hi ${BUSINESS.owner.split(" ")[0]}, I'm ${user.user_metadata?.full_name || user.email} and I have a question about my plan.`)}`} target="_blank" rel="noreferrer"><MessageCircle size={18} /> Chat on WhatsApp</a>
-          </section>
+          </section>}
           <section className="ud-card ud-promo">
             <h3>Looking for something else?</h3>
             <p>PCOS, thyroid, pregnancy and more. Find the plan that fits your next goal.</p>
