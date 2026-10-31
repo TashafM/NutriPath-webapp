@@ -36,6 +36,7 @@ import {
   ChartNoAxesColumnIncreasing,
   Flower2,
   Leaf,
+  LoaderCircle,
   Menu,
   Phone,
   Moon,
@@ -43,23 +44,32 @@ import {
   X,
 } from "lucide-react";
 
-const loadCheckout = () => new Promise((resolve, reject) => {
-  if (window.Razorpay) return resolve();
-  const script = document.createElement("script");
-  script.src = "https://checkout.razorpay.com/v1/checkout.js";
-  script.onload = resolve;
-  script.onerror = reject;
-  document.body.appendChild(script);
-});
+// One shared load: the background preload and a click never add the script twice.
+let checkoutScript;
+const loadCheckout = () => {
+  checkoutScript ??= new Promise((resolve, reject) => {
+    if (window.Razorpay) return resolve();
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = resolve;
+    script.onerror = () => {
+      checkoutScript = null; // allow a retry
+      reject();
+    };
+    document.body.appendChild(script);
+  });
+  return checkoutScript;
+};
 
 const postJson = (url, body, headers = {}) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) });
 
-async function buyPlan(plan) {
+async function buyPlan(plan, setBuying) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return window.location.assign("/login?next=/%23services");
+  setBuying(plan.id);
   try {
-    await loadCheckout();
-    const res = await postJson("/api/razorpay/order", { id: plan.id }, { Authorization: `Bearer ${session.access_token}` });
+    // Load Razorpay's script and create the order at the same time.
+    const [, res] = await Promise.all([loadCheckout(), postJson("/api/razorpay/order", { id: plan.id }, { Authorization: `Bearer ${session.access_token}` })]);
     if (res.status === 409) return window.location.assign("/dashboard"); // already has this plan active
     const order = await res.json();
     if (!res.ok) throw new Error(order.error);
@@ -80,6 +90,8 @@ async function buyPlan(plan) {
     }).open();
   } catch {
     alert("Could not start the payment. Please try again in a moment.");
+  } finally {
+    setBuying(null);
   }
 }
 
@@ -113,6 +125,13 @@ export default function Home({ plans }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activePlans, setActivePlans] = useState([]);
   const [showMore, setShowMore] = useState(false);
+  const [buying, setBuying] = useState(null); // plan id while its checkout is being prepared
+
+  // Fetch Razorpay's checkout script in the background so "Enrol Now" opens faster.
+  useEffect(() => {
+    const idle = window.requestIdleCallback || ((callback) => setTimeout(callback, 1500));
+    idle(() => loadCheckout().catch(() => {}));
+  }, []);
   const bookingDialog = useRef(null);
   const openBooking = () => bookingDialog.current?.showModal();
   const [loggedIn, setLoggedIn] = useState(false);
@@ -208,7 +227,7 @@ export default function Home({ plans }) {
                   {activePlans.includes(service.id) ? (
                     <Link className="button button-outline plan-buy" href="/dashboard">View plan <ArrowRight size={16} /></Link>
                   ) : (
-                    <button type="button" className="button button-dark plan-buy" onClick={() => buyPlan(service)}>Enrol Now <ArrowRight size={16} /></button>
+                    <button type="button" className="button button-dark plan-buy" disabled={buying !== null} onClick={() => buyPlan(service, setBuying)}>{buying === service.id ? <><LoaderCircle size={16} className="spin" /> Opening…</> : <>Enrol Now <ArrowRight size={16} /></>}</button>
                   )}
                 </div>
               </div>
@@ -236,7 +255,7 @@ export default function Home({ plans }) {
                 {active ? (
                   <Link className="button button-outline program-button" href="/dashboard"><CircleCheck size={15} /> Active · View plan</Link>
                 ) : (
-                  <button type="button" className="button button-dark program-button" onClick={() => buyPlan(service)}>Enrol Now <ArrowRight size={15} /></button>
+                  <button type="button" className="button button-dark program-button" disabled={buying !== null} onClick={() => buyPlan(service, setBuying)}>{buying === service.id ? <><LoaderCircle size={15} className="spin" /> Opening…</> : <>Enrol Now <ArrowRight size={15} /></>}</button>
                 )}
               </article>
             );
